@@ -1,0 +1,101 @@
+---
+title: "Econometria"
+author: "Adrian, Beatriz, Flávio e Lucas"
+date: '2022-03-24'
+output: html_document
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+```
+
+```{r}
+## Instalando e carregando bibliotecas
+
+install.packages("dplyr")
+install.packages("ggplot2")
+install.packages("modelsummary")
+install.packages("DT")
+install.packages("faraway")
+install.packages("lmtest")
+
+library(dplyr)
+library(ggplot2)
+library(modelsummary)
+library(magrittr)
+library(kableExtra)
+
+
+## Importando base de dados de um arquivo CSV.
+
+base_crime <- read.csv("base_crime_2014_clean.csv", sep = ",")
+cidades <- read.csv("cidades.csv", sep = ",")
+
+base_crime$ano <- as.integer(base_crime$ano)
+base_crime$municipio <- as.integer(base_crime$municipio)
+
+base_crime_joined <- dplyr::inner_join(base_crime, cidades, c("municipio" = "codigo")) %>%
+  dplyr::select(c("ano", "nome", "homicidio", "gastos_educacao", "renda_setor_formal", "gastos_seguranca_publica")) %>%
+  dplyr::rename("municipio" = "nome")
+```
+
+
+## Análise descritiva
+
+Cidades mineiras, da base, que realizaram algum gasto com educação ou segurança pública, além de terem alguma renda de setor formal registrada, no ano de 2014.
+
+Total de cidades: 672
+
+```{r echo=FALSE}
+
+## Total de cidades analisadas
+
+total_de_cidades_analisas <- dplyr::count(base_crime_joined)
+total_de_cidades_analisas
+```
+
+```{r}
+## Dando uma olhada no formato dos dados
+
+DT::datatable(base_crime_joined)
+
+## ano (integer): Ano de registro dos dados
+## municipio (character): Nome do município analisado
+## homicidio (double): Taxa de homicídio doloso
+## gastos_educacao (double): Gasto per capita com educação
+## renda_setor_formal (double): Rendimento médio do setor formal
+## gastos_seguranca_publica (double): Gasto per capita com segurança pública
+
+```
+
+```{r}
+modelsummary::datasummary_skim(base_crime_joined[3:6], type = "numeric", title = "Análise descritiva")
+```
+
+```{r}
+model <- lm(formula = "homicidio ~ log(gastos_educacao) + log(renda_setor_formal) + log(gastos_seguranca_publica)", data = base_crime_joined)
+
+summary(model)
+```
+```{r}
+## Testando a presença de autocorrelação residual
+
+lmtest::dwtest(model)
+
+## Como temos um p-value = 0.5291, não podemos rejeitar a hipótese nula (ausência de autocorrelação).
+```
+
+```{r}
+bgtest(model, order = 1)
+```
+
+
+```{r}
+bptest(model)
+```
+
+
+```{r}
+ggplot2::ggplot(base_crime_joined, aes(x=log(gastos_educacao), y = homicidio)) + ggplot2::geom_point() + geom_smooth(method=glm)
+
+```

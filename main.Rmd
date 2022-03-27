@@ -1,0 +1,273 @@
+---
+title: "Econometria"
+author: "Adrian, Beatriz, Flávio e Lucas"
+date: '2022-03-24'
+output:
+  html_document: default
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+
+## Instalação de pacotes.
+
+## Carregando pacotes.
+
+library(dplyr)
+library(ggplot2)
+library(lmtest)
+library(highcharter)
+library(lmtest)
+library(reactable)
+library(faraway)
+library(AER)
+library(acepack)
+library(sem)
+```
+
+
+## Base de dados
+
+A base de dados contém diversas informações sobre as 853 cidades mineiras.
+Precisamos de algumas informações relacionadas ao crime nessas cidades.
+
+```{r}
+
+## Carregando a base de dados com informações sobre cidades mineiras de um arquivo CSV.
+base_crime <- read.csv("base_crime.csv") |>
+  tibble()
+
+## Carregando o nome dos municipios para cruzar com a base de dados.
+cidades <- read.csv("cidades.csv") |>
+  tibble()
+
+## Cruzando os dados e extraíndo variáveis que utilizaremos posteriormente.
+
+base_raw <- readxl::read_xlsx("base_crime.xlsx", sheet = "Painel")
+
+dados_pib <- base_raw |>
+  rename(c("municipio" = "município", "pib" = "PIB per capita")) |> 
+  select("municipio", "ano", "pib") |>
+  inner_join(cidades, c("municipio" = "codigo")) |>
+  select("ano", "nome", "pib") |>
+  rename("municipio" = "nome")
+
+base_crime_joined <- inner_join(base_crime, cidades, c("municipio" = "codigo")) |>
+  select(
+    "ano",
+    "nome", 
+    "populacao",
+    "homicidio",
+    "gastos_educacao",
+    "renda_setor_formal",
+    "gastos_seguranca_publica"
+  ) |>
+  rename("municipio" = "nome")
+
+
+
+```
+
+## Dando uma olhada nos dados:
+
+```{r echo=FALSE}
+reactable(
+  base_crime_joined,
+  defaultPageSize = 5,
+  searchable = TRUE,
+  striped = TRUE,
+  highlight = TRUE,
+  theme = reactableTheme(
+    borderColor = "#dfe2e5",
+    stripedColor = "#f6f8fa",
+    highlightColor = "#f0f5f9",
+    style = list(fontFamily = "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"),
+    searchInputStyle = list(width = "100%")
+  )
+)
+
+```
+
+
+## Sobre as variáveis do modelo:
+
+* homicidio (*double*): Taxa de homicídio doloso para cada 100 habitantes
+* gastos_educacao (*double*): Gasto per capita com educação
+* renda_setor_formal (*double*): Rendimento médio do setor formal
+* gastos_seguranca_publica (*double*): Gasto per capita com segurança pública
+
+
+## Análise descritiva
+
+```{r}
+## Filtrando dados de 2017
+base_crime_2017 <- base_crime_joined |> filter(ano == 2017)
+
+## Análise descritiva das variáveis numéricas
+modelsummary::datasummary_skim(base_crime_2017[4:7])
+```
+
+## Tratamento dos dados
+
+Inicialmente, vamos tentar remover *outliers* que possam viesar nosso modelo.
+
+Os *boxplots* nos auxiliam nessa tarefa:
+```{r warning=FALSE}
+hcboxplot(base_crime_2017$homicidio, outliers = FALSE)
+hcboxplot(base_crime_2017$gastos_educacao, outliers = FALSE)
+hcboxplot(base_crime_2017$gastos_seguranca_publica, outliers = FALSE)
+hcboxplot(base_crime_2017$renda_setor_formal, outliers = FALSE)
+```
+
+Removendo outliers baseado na análise dos *boxplots* e selecionando uma amostra com 95% dos dados, para analisar o impacto que pequenas variações na amostra geram na estimação do modelo.
+
+```{r}
+
+# Removendo outliers baseado na análise do boxplot
+
+# Ao final, selecionamos aleatoriamente uma amostra de 95% dos dados,
+# para verificar como os parâmetros do se comportam fazendo pequenas alterações na amostra.
+
+base_final <- base_crime_joined |>
+  filter(ano == 2017) |>
+  filter(gastos_seguranca_publica > 0) |>
+  filter(homicidio > 0) |>
+  filter(gastos_educacao > 200 & gastos_educacao < 1500) |>
+  filter(renda_setor_formal > 1000 & renda_setor_formal < 2500) |>
+  sample_frac(0.95, replace = FALSE)
+
+##  write.csv("backup.csv", base_final)
+
+backup <- read.csv("backup.csv")
+```
+
+Ao final, temos uma amostra de 384 cidades mineiras.
+
+## O modelo
+
+Buscamos entender se o log da taxa de homicídios (homicídios para cada 100 mil habitantes) é explicado pela combinação de: gasto per capita com segurança pública, gasto per capita com educação e renda média do setor formal.
+
+```{r}
+model <- lm(formula = "log(homicidio) ~ gastos_seguranca_publica + renda_setor_formal + gastos_educacao", data = backup)
+
+summary(model)
+```
+
+## Testando a presença de multicolinearidade
+
+Por do cálculo do Fator de Inflacionamento da variância, podemos verificar se há multicolinearidade entre as variáveis explicativas, valores superiores ou iguais a 10 indica a presença de multicolinearidade prejudicial.
+
+
+```{r}
+vif(model)
+```
+
+
+## Testando a presença de autocorrelação residual
+
+Podemos realizar o teste Durbin-Watson para detectar autocorrelação residual:
+
+- $H_0$: ausência de autocorrelação
+- $H_1$: autocorrelação serial de primeira ordem
+
+
+```{r}
+dwtest(model)
+```
+Como o p-valor = 0.1062, não podemos rejeitar a hipótese nula (ausência de autorrelação).
+
+
+## Testando a presença de heterocedasticidade nos residuos
+
+Utilizamos o teste Breuch-Pagan para identificar heterocedasticidades no resíduos.
+
+- $H_0$: variância constante
+- $H_1$: variância não-constante
+
+```{r}
+bptest(model)
+```
+Como o p-value do teste é igual a 0.2451, não podemos rejeitar a hipótese nula (variância constante)
+
+
+## Testando a normalidade dos residuos
+
+Por meio do teste de normalidade Shapiro-Wilk, podemos testar os resíduos são normalmente distribuídos.
+
+- $H_0$: Erros normalmente distribuídos
+- $H_1$: Erros não são normalmente distribuídos
+
+```{r}
+residuos <- model$residuals
+
+shapiro.test(residuos)
+```
+Como o p-value = 0.181, não podemos rejeitar a hipótese nula (de que os erros são distribuídos normalmente)
+
+
+## Testando endogeneidade
+
+Se descrevermos o modelo como:
+
+$$
+log(H)_i = \beta_0 + \beta_1 S_i + \beta_2 E_i + \beta_3 R_i + \mu_i
+$$
+
+em que $log(H)_i =$ logaritmo da taxa de homicídio observada, $S_i =$ gasto per capita com segurança pública observada, $E_i =$ gastos per capita com educação observada, $R_i =$ renda média do setor formal observada e $\mu_i$ o resíduo observado.
+
+Podemos verificar se $S_i$ é endógena, ou seja, se $S_i$ é correlacionada com o resíduo $\mu_i$.
+
+Regredindo, por MQO, a variável explicativa endógena, gasto per capita com segurança pública, em função das varíveis exógenas $E_i$, $R_i$ e do PIB per capita $P$, variável assumida como exógena, excluída do modelo, obtemos os valores estimados de $\hat{S_i}$ e do resíduo $\hat{v_i}$, definidos por (1) e (2):
+
+$$
+S_i = \hat{\beta_0} + \hat{\beta_1} E  + \hat{\beta_2} R + \hat{\beta_3} P + \hat{v_i}     (1)
+$$
+
+$$
+S_i = \hat{S_i} + \hat{v_i}   (2)
+$$
+
+```{r}
+
+## Enriquecendo base com dados do PIB per capita das cidades
+base_final_pib <- backup |>
+  inner_join(dados_pib, c("municipio" = "municipio", "ano" = "ano"))
+
+## Estimando (1)
+model_s <- lm(gastos_seguranca_publica ~ gastos_educacao + renda_setor_formal + pib, base_final_pib)
+
+summary(model_s)
+
+## Gasto per capita com segurança pública estimado
+s_estimado <- model_s$fitted.values
+
+residuo_estimado <- model_s$residuals
+```
+
+Agora, retornamos ao modelo estrutural e regredimos $log(H)_i$ em função dos valores estimados $\hat{S_i}$ e do resíduo estimado $\hat{v_i}$:
+
+$$
+log(H)_i = \hat{\beta_0} + \hat{\beta_1} \hat{S_i} + \hat{\beta_2} \hat{v_i} + \hat{u_{2i}}
+$$
+
+```{r}
+teste_endogeneidade <- lm(log(homicidio) ~ s_estimado + residuo_estimado, base_final_pib)
+
+summary(teste_endogeneidade)
+```
+Como $\hat{\beta_2}$ é estatisticamente diferente de zero, rejeitamos a hipótese nula (de que não há simultaneidade).
+
+
+Neste caso, regredimos o modelo com MQ2E, substituindo $S_i$ pelos valores estimados $\hat{S_i}$ no modelo estrutural:
+
+$$
+log(H)_i = \beta_0 + \beta_1 \hat{S_i} + \beta_2 E_i + \beta_3 R_i + \mu_i
+$$
+
+
+```{r}
+modelo_mq2e <- lm(log(homicidio) ~ s_estimado + gastos_educacao + renda_setor_formal, base_final_pib)
+
+summary(modelo_mq2e)
+```
+
