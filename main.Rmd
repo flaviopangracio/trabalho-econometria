@@ -11,6 +11,17 @@ knitr::opts_chunk$set(echo = TRUE)
 
 ## Instalação de pacotes.
 
+# install.packages("dplyr")
+# install.packages("ggplot2")
+# install.packages("lmtest")
+# install.packages("highcharter")
+# install.packages("lmtest")
+# install.packages("reactable")
+# install.packages("faraway")
+# install.packages("AER")
+# install.packages("acepack")
+# install.packages("sem")
+
 ## Carregando pacotes.
 
 library(dplyr)
@@ -93,7 +104,7 @@ reactable(
 
 * homicidio (*double*): Taxa de homicídio doloso para cada 100 habitantes
 * gastos_educacao (*double*): Gasto per capita com educação
-* renda_setor_formal (*double*): Rendimento médio do setor formal
+* renda_setor_formal (*double*): Rendimento per capita do setor formal
 * gastos_seguranca_publica (*double*): Gasto per capita com segurança pública
 
 
@@ -207,16 +218,22 @@ Como o p-value = 0.181, não podemos rejeitar a hipótese nula (de que os erros 
 
 ## Testando endogeneidade
 
-Se descrevermos o modelo como:
+Se descrevermos o modelo de equações simultâneas como:
 
 $$
 log(H)_i = \beta_0 + \beta_1 S_i + \beta_2 E_i + \beta_3 R_i + \mu_i
 $$
 
-em que $log(H)_i =$ logaritmo da taxa de homicídio observada, $S_i =$ gasto per capita com segurança pública observada, $E_i =$ gastos per capita com educação observada, $R_i =$ renda média do setor formal observada e $\mu_i$ o resíduo observado.
+$$
+S_i = log(H)_i + P
+$$
+
+em que $log(H)_i =$ logaritmo da taxa de homicídio observada, $S_i =$ gasto per capita com segurança pública observada, $E_i =$ gasto per capita com educação observada, $R_i =$ renda per capita do setor formal observada e $\mu_i$ o resíduo observado.
+
+Utilizamos $S_i = log(H)_i + P$ como uma equação auxiliar do modelo.
 
 Podemos verificar se $S_i$ é endógena, ou seja, se $S_i$ é correlacionada com o resíduo $\mu_i$.
-
+ 
 Regredindo, por MQO, a variável explicativa endógena, gasto per capita com segurança pública, em função das varíveis exógenas $E_i$, $R_i$ e do PIB per capita $P$, variável assumida como exógena, excluída do modelo, obtemos os valores estimados de $\hat{S_i}$ e do resíduo $\hat{v_i}$, definidos por (1) e (2):
 
 $$
