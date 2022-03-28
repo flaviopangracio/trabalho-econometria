@@ -225,7 +225,7 @@ log(H)_i = \beta_0 + \beta_1 S_i + \beta_2 E_i + \beta_3 R_i + \mu_i
 $$
 
 $$
-S_i = log(H)_i + P
+S_i = \alpha_0 +  \alpha_1 log(H)_i + \alpha_2 P + \mu_{2i}
 $$
 
 em que $log(H)_i =$ logaritmo da taxa de homicídio observada, $S_i =$ gasto per capita com segurança pública observada, $E_i =$ gasto per capita com educação observada, $R_i =$ renda per capita do setor formal observada e $\mu_i$ o resíduo observado.
