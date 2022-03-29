@@ -3,7 +3,8 @@ title: "Econometria"
 author: "Adrian, Beatriz, Flávio e Lucas"
 date: '2022-03-24'
 output:
-  html_document: default
+  md_document: default
+always_allow_html: true
 ---
 
 ```{r setup, include=FALSE}
@@ -79,26 +80,6 @@ base_crime_joined <- inner_join(base_crime, cidades, c("municipio" = "codigo")) 
 
 ```
 
-## Dando uma olhada nos dados:
-
-```{r echo=FALSE}
-reactable(
-  base_crime_joined,
-  defaultPageSize = 5,
-  searchable = TRUE,
-  striped = TRUE,
-  highlight = TRUE,
-  theme = reactableTheme(
-    borderColor = "#dfe2e5",
-    stripedColor = "#f6f8fa",
-    highlightColor = "#f0f5f9",
-    style = list(fontFamily = "-apple-system, BlinkMacSystemFont, Segoe UI, Helvetica, Arial, sans-serif"),
-    searchInputStyle = list(width = "100%")
-  )
-)
-
-```
-
 
 ## Sobre as variáveis do modelo:
 
@@ -121,14 +102,6 @@ modelsummary::datasummary_skim(base_crime_2017[4:7])
 ## Tratamento dos dados
 
 Inicialmente, vamos tentar remover *outliers* que possam viesar nosso modelo.
-
-Os *boxplots* nos auxiliam nessa tarefa:
-```{r warning=FALSE}
-hcboxplot(base_crime_2017$homicidio, outliers = FALSE)
-hcboxplot(base_crime_2017$gastos_educacao, outliers = FALSE)
-hcboxplot(base_crime_2017$gastos_seguranca_publica, outliers = FALSE)
-hcboxplot(base_crime_2017$renda_setor_formal, outliers = FALSE)
-```
 
 Removendo outliers baseado na análise dos *boxplots* e selecionando uma amostra com 95% dos dados, para analisar o impacto que pequenas variações na amostra geram na estimação do modelo.
 
